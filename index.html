@@ -331,13 +331,13 @@ class BPlusTree {
   }
 
   _splitLeaf(node, log){
-    const mid = Math.ceil(node.keys.length / 2);
+    const mid = this.t - 1;
     const right = new Node(true);
     right.keys = node.keys.splice(mid);
     right.next = node.next;
     node.next = right;
     const sep = right.keys[0];
-    if(log) log.push({type:'split', msg:`🔀 Split leaf! คัดลอก separator [${sep}] ขึ้น parent`, key:sep, leftId:node.id, rightId:right.id});
+    if(log) log.push({type:'split', msg:`🔀 Split leaf! คัดลอก lower median [${sep}] ขึ้น parent`, key:sep, leftId:node.id, rightId:right.id});
     return {sep, right};
   }
 
@@ -628,7 +628,7 @@ function updateRuleText(){
       `ข้อมูลจริงอยู่ที่ leaf เท่านั้น และ leaf เชื่อมกันเป็นลำดับ<br>
        index node เก็บ separator เพื่อพาไปยัง child ที่ถูกต้อง<br>
        leaf เก็บได้สูงสุด <span class="pill">${2*t-1}</span> keys, index เก็บได้ <span class="pill">${2*t-2}</span> separators<br>
-       เมื่อ leaf หรือ index เต็ม จะ split แล้วส่ง separator ขึ้น parent`;
+       เมื่อ leaf เต็ม จะ split โดย copy lower median ขึ้น parent`;
   } else {
     document.getElementById('rule-text').innerHTML=
       `แต่ละ node เก็บ <span class="pill">${t-1}–${2*t-1}</span> keys ยกเว้น root<br>
