@@ -134,7 +134,7 @@ btn,button{display:inline-flex;align-items:center;justify-content:center;height:
         <button class="seg-btn" id="mode-bplus" onclick="changeTreeKind('bplus')">B+ Tree</button>
       </div>
       <div class="row">
-        <span class="label">Order (t)</span>
+        <span class="label">Max keys</span>
         <select id="sel-order" onchange="changeOrder()">
           <option value="2">t = 2 (max 3 keys)</option>
           <option value="3" selected>t = 3 (max 5 keys)</option>
@@ -183,14 +183,14 @@ btn,button{display:inline-flex;align-items:center;justify-content:center;height:
     <div class="panel" style="flex:1">
       <h3>ข้อมูลสถิติ</h3>
       <div class="prop-grid" id="stats-grid">
-        <div class="prop-card"><div class="prop-lbl">Order (t)</div><div class="prop-val" id="st-t">3</div></div>
+        <div class="prop-card"><div class="prop-lbl">Order</div><div class="prop-val" id="st-order">4</div></div>
         <div class="prop-card"><div class="prop-lbl">Keys</div><div class="prop-val" id="st-keys">0</div></div>
         <div class="prop-card"><div class="prop-lbl">Nodes</div><div class="prop-val" id="st-nodes">0</div></div>
         <div class="prop-card"><div class="prop-lbl">ความสูง</div><div class="prop-val" id="st-h">0</div></div>
       </div>
 
       <div class="rule-box">
-        <div class="rule-title">กฎ <span id="rule-tree-name">B-Tree</span> (t = <span id="t-val">3</span>)</div>
+        <div class="rule-title">กฎ <span id="rule-tree-name">B-Tree</span> (order = <span id="t-val">4</span>)</div>
         <div class="rule-text" id="rule-text"></div>
       </div>
 
@@ -284,6 +284,7 @@ class BTree {
   }
 
   stats(){
+    if(this.n === 0) return {nodes:0, h:0, leaves:0, keys:0};
     let nodes=0, h=0, leaves=0;
     const go=(n,d)=>{if(!n)return;nodes++;h=Math.max(h,d);if(n.leaf)leaves++;n.ch.forEach(c=>go(c,d+1));};
     go(this.root, 1);
@@ -367,6 +368,7 @@ class BPlusTree {
   }
 
   stats(){
+    if(this.n === 0) return {nodes:0, h:0, leaves:0, keys:0};
     let nodes=0, h=0, leaves=0;
     const go=(n,d)=>{if(!n)return;nodes++;h=Math.max(h,d);if(n.leaf)leaves++;n.ch.forEach(c=>go(c,d+1));};
     go(this.root, 1);
@@ -404,7 +406,6 @@ function layout(n, x, y){
 let treeKind = 'btree';
 function treeLabel(){ return treeKind === 'bplus' ? 'B+ Tree' : 'B-Tree'; }
 function createTree(t){ return treeKind === 'bplus' ? new BPlusTree(t) : new BTree(t); }
-function maxKeys(){ return 2*tree.t - 1; }
 
 let tree = createTree(3);
 let hl = {};      // nodeId -> 'insert'|'split'|'path'|'found'
@@ -611,7 +612,7 @@ function updateOrderLabels(){
 
 function updateStats(){
   const s=tree.stats(), t=tree.t;
-  document.getElementById('st-t').textContent=t;
+  document.getElementById('st-order').textContent=t+1;
   document.getElementById('st-keys').textContent=s.keys;
   document.getElementById('st-nodes').textContent=s.nodes;
   document.getElementById('st-h').textContent=s.h;
@@ -620,7 +621,7 @@ function updateStats(){
 function updateRuleText(){
   const t=tree.t;
   updateModeUI();
-  document.getElementById('t-val').textContent=t;
+  document.getElementById('t-val').textContent=t+1;
   if(treeKind === 'bplus'){
     document.getElementById('rule-text').innerHTML=
       `ข้อมูลจริงอยู่ที่ leaf เท่านั้น และ leaf เชื่อมกันเป็นลำดับ<br>
