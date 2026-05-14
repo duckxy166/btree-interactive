@@ -224,49 +224,48 @@ class Node {
 
 class BTree {
   constructor(t){ this.t = t; this.root = new Node(); this.n = 0; }
+  get maxKeys(){ return this.t; }
 
   insert(k, log){
-    const r = this.root;
-    if(r.keys.length === 2*this.t - 1){
+    const split = this._ins(this.root, k, log);
+    if(split){
       const s = new Node(false);
-      s.ch.push(r);
+      s.keys = [split.sep];
+      s.ch = [this.root, split.right];
       this.root = s;
-      this._split(s, 0, log);
-      this._ins(s, k, log);
-    } else {
-      this._ins(r, k, log);
+      if(log) log.push({type:'split', msg:`🔀 Split root! median [${split.sep}] ขึ้นเป็น root ใหม่`, key:split.sep, parentId:s.id, leftId:s.ch[0].id, rightId:split.right.id});
     }
     this.n++;
   }
 
-  _split(par, i, log){
-    const t = this.t, y = par.ch[i];
-    const z = new Node(y.leaf);
-    z.keys = y.keys.splice(t);
-    const med = y.keys.splice(t-1, 1)[0];
-    if(!y.leaf) z.ch = y.ch.splice(t);
-    par.ch.splice(i+1, 0, z);
-    par.keys.splice(i, 0, med);
-    if(log) log.push({type:'split', msg:`🔀 Split! ค่ากลาง [${med}] ขึ้นสู่ parent`, key:med, parentId:par.id, leftId:y.id, rightId:z.id});
-    return {medianNode: par, leftId: y.id, rightId: z.id};
+  _ins(node, k, log){
+    if(node.leaf){
+      let i = 0;
+      while(i < node.keys.length && k > node.keys[i]) i++;
+      node.keys.splice(i, 0, k);
+      if(log) log.push({type:'insert', msg:`➕ เพิ่ม [${k}] ลง leaf node`});
+      return node.keys.length > this.maxKeys ? this._splitNode(node, log) : null;
+    }
+
+    let i = 0;
+    while(i < node.keys.length && k > node.keys[i]) i++;
+    const split = this._ins(node.ch[i], k, log);
+    if(!split) return null;
+
+    node.keys.splice(i, 0, split.sep);
+    node.ch.splice(i+1, 0, split.right);
+    return node.keys.length > this.maxKeys ? this._splitNode(node, log) : null;
   }
 
-  _ins(node, k, log){
-    let i = node.keys.length - 1;
-    if(node.leaf){
-      while(i>=0 && k < node.keys[i]) i--;
-      node.keys.splice(i+1, 0, k);
-      if(log) log.push({type:'insert', msg:`➕ เพิ่ม [${k}] ลง leaf node`});
-    } else {
-      while(i>=0 && k < node.keys[i]) i--;
-      i++;
-      const child = node.ch[i];
-      if(child.keys.length === 2*this.t-1){
-        this._split(node, i, log);
-        if(k > node.keys[i]) i++;
-      }
-      this._ins(node.ch[i], k, log);
-    }
+  _splitNode(node, log){
+    const mid = Math.floor(node.keys.length / 2);
+    const sep = node.keys[mid];
+    const right = new Node(node.leaf);
+    right.keys = node.keys.splice(mid + 1);
+    node.keys.splice(mid, 1);
+    if(!node.leaf) right.ch = node.ch.splice(mid + 1);
+    if(log) log.push({type:'split', msg:`🔀 Split! median [${sep}] ขึ้นสู่ parent`, key:sep, leftId:node.id, rightId:right.id});
+    return {sep, right};
   }
 
   search(k){
@@ -606,7 +605,7 @@ function updateOrderLabels(){
     const t = parseInt(opt.value);
     opt.textContent = treeKind === 'bplus'
       ? `t = ${t} (order ${t+1}, max ${t} keys)`
-      : `t = ${t} (max ${2*t-1} keys)`;
+      : `t = ${t} (order ${t+1}, max ${t} keys)`;
   });
 }
 
@@ -630,9 +629,9 @@ function updateRuleText(){
        เมื่อ node ล้น จะ split แล้ว copy separator ตัวแรกของฝั่งขวาขึ้น parent`;
   } else {
     document.getElementById('rule-text').innerHTML=
-      `แต่ละ node เก็บ <span class="pill">${t-1}–${2*t-1}</span> keys ยกเว้น root<br>
-       มีได้สูงสุด <span class="pill">${2*t}</span> children<br>
-       เมื่อ node เต็ม <span class="pill">${2*t-1} keys</span> จะ split อัตโนมัติ<br>
+      `แต่ละ node เก็บได้สูงสุด <span class="pill">${t}</span> keys หรือ <span class="pill">${t+1}</span> children<br>
+       เมื่อ node ล้น จะ split แล้วดัน median ขึ้น parent<br>
+       median จะถูกย้ายออกจาก node ลูก ต่างจาก B+ tree ที่ copy separator<br>
        ทุก leaf อยู่ระดับเดียวกัน → ค้นหา O(log n) เสมอ`;
   }
 }
