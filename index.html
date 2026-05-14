@@ -444,8 +444,11 @@ function render(){
   // edges
   const edges=(n)=>{
     if(!n||n.leaf) return;
-    n.ch.forEach(c=>{
-      const x1=n.cx, y1=n.cy+KH, x2=c.cx, y2=c.cy;
+    n.ch.forEach((c,i)=>{
+      const left = n.cx - n.nw/2;
+      const slotW = n.nw / n.ch.length;
+      const x1 = left + slotW * (i + 0.5);
+      const y1=n.cy+KH, x2=c.cx, y2=c.cy;
       const my=(y1+y2)/2;
       out+=`<path d="M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}" fill="none" stroke="#cbd5e1" stroke-width="1.5"/>`;
       edges(c);
