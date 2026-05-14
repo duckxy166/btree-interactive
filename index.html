@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B-Tree / B+ Tree Explorer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f1f5f9;color:#1e293b;min-height:100vh;display:flex;flex-direction:column}
+
+#header{background:#0f172a;color:white;padding:12px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+#header h1{font-size:17px;font-weight:600;letter-spacing:-0.2px}
+.badge{background:#0d9488;color:white;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600}
+.tagline{margin-left:auto;font-size:12px;color:#64748b}
+
+#main{display:flex;flex:1;overflow:hidden;height:calc(100vh - 45px)}
+
+#viz-area{flex:1;overflow:auto;background:white;position:relative;border-right:1px solid #e2e8f0}
+#tree-svg{display:block;min-width:100%;transition:all 0.3s}
+#empty-state{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:#94a3b8;pointer-events:none}
+#empty-state .icon{font-size:52px;opacity:0.4}
+#empty-state p{font-size:13px;margin-top:8px}
+
+#sidebar{width:280px;display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0}
+.panel{padding:14px 16px;border-bottom:1px solid #e2e8f0}
+.panel h3{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:10px}
+
+.row{display:flex;gap:6px;margin-bottom:7px;align-items:center}
+.label{font-size:12px;color:#64748b;white-space:nowrap;min-width:60px}
+.segmented{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:#e2e8f0;border-radius:7px;padding:3px;margin-bottom:9px}
+.seg-btn{height:28px;border-radius:5px;background:transparent;color:#64748b;border:none;padding:0 8px}
+.seg-btn.active{background:white;color:#0f766e;box-shadow:0 1px 2px rgba(15,23,42,.08)}
+.seg-btn:hover{color:#0f766e}
+
+select,input[type=number]{flex:1;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 9px;font-size:13px;background:white;outline:none;color:#1e293b;transition:border-color 0.15s}
+select:focus,input:focus{border-color:#0d9488;box-shadow:0 0 0 2px rgba(13,148,136,.12)}
+
+btn,button{display:inline-flex;align-items:center;justify-content:center;height:32px;padding:0 13px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;transition:all 0.15s;letter-spacing:0.2px}
+.btn-teal{background:#0d9488;color:white}.btn-teal:hover{background:#0f766e}
+.btn-blue{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}.btn-blue:hover{background:#dbeafe}
+.btn-red{background:#fff1f2;color:#e11d48;border:1px solid #fecdd3}.btn-red:hover{background:#ffe4e6}
+.btn-gray{background:#f1f5f9;color:#475569;border:1px solid #e2e8f0}.btn-gray:hover{background:#e2e8f0}
+.btn-full{width:100%}
+
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{height:24px;padding:0 10px;border-radius:12px;border:1px solid #e2e8f0;background:white;color:#64748b;font-size:11px;cursor:pointer;font-weight:500;transition:all 0.1s}
+.chip:hover{border-color:#0d9488;color:#0d9488;background:#f0fdfa}
+
+#log-box{max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+.log-item{font-size:11px;padding:5px 9px;border-radius:5px;border-left:2.5px solid #e2e8f0;background:white;color:#64748b;line-height:1.4}
+.log-insert{border-color:#0d9488;background:#f0fdfa;color:#134e4a}
+.log-split{border-color:#f59e0b;background:#fffbeb;color:#78350f}
+.log-found{border-color:#10b981;background:#ecfdf5;color:#065f46}
+.log-notfound{border-color:#f43f5e;background:#fff1f2;color:#9f1239}
+.log-info{border-color:#94a3b8}
+
+.prop-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+.prop-card{background:#f8fafc;border-radius:6px;padding:8px 10px;border:1px solid #e2e8f0}
+.prop-lbl{font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.prop-val{font-size:18px;font-weight:700;color:#0f172a;font-family:'Courier New',monospace}
+
+.rule-box{background:#f8fafc;border-radius:6px;padding:10px;border:1px solid #e2e8f0;margin-bottom:8px}
+.rule-title{font-size:11px;font-weight:700;color:#334155;margin-bottom:4px}
+.rule-text{font-size:11px;color:#64748b;line-height:1.6}
+.pill{display:inline-block;background:#e0f2fe;color:#0369a1;font-family:monospace;font-size:10px;padding:1px 6px;border-radius:4px;margin:1px}
+
+.legend{display:flex;flex-direction:column;gap:5px}
+.leg-item{display:flex;align-items:center;gap:7px;font-size:11px;color:#64748b}
+.leg-swatch{width:22px;height:14px;border-radius:3px;flex-shrink:0;border-width:2px;border-style:solid}
+
+@keyframes pop{0%{transform:scale(1.15)}100%{transform:scale(1)}}
+.node-new rect{animation:pop 0.3s ease-out}
+
+@media (max-width: 760px){
+  body{min-height:100dvh}
+  #header{padding:10px 14px;gap:8px;flex-wrap:wrap}
+  #header h1{font-size:15px;line-height:1.25}
+  .badge{font-size:9px;padding:2px 6px}
+  .tagline{width:100%;margin-left:0;font-size:11px;color:#cbd5e1}
+  #main{height:auto;min-height:calc(100dvh - 72px);overflow:visible;flex-direction:column}
+  #sidebar{order:1;width:100%;overflow:visible;border-bottom:1px solid #e2e8f0}
+  #viz-area{order:2;min-height:420px;border-right:0;overflow:auto}
+  #empty-state{width:min(280px, 86vw)}
+  .panel{padding:12px 14px}
+  .row{gap:7px}
+  .label{min-width:68px;font-size:11px}
+  select,input[type=number]{min-width:0;height:36px;font-size:16px}
+  button{height:36px}
+  .chip{height:30px;border-radius:15px}
+  #log-box{max-height:120px}
+  .prop-grid{grid-template-columns:repeat(4, minmax(0, 1fr));gap:5px}
+  .prop-card{padding:7px 8px}
+  .prop-lbl{font-size:9px}
+  .prop-val{font-size:16px}
+}
+
+@media (max-width: 460px){
+  #main{min-height:calc(100dvh - 88px)}
+  .segmented{margin-bottom:10px}
+  .row{align-items:stretch}
+  .label{display:flex;align-items:center}
+  .btn-full{height:34px}
+  .chips{gap:6px}
+  .chip{flex:1 1 calc(50% - 6px);padding:0 8px}
+  .prop-grid{grid-template-columns:1fr 1fr}
+  .rule-box{padding:9px}
+  #viz-area{min-height:360px}
+}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>🌳 B-Tree / B+ Tree Explorer</h1>
+  <span class="badge">Interactive</span>
+  <span class="tagline">เรียนรู้ B-Tree และ B+ Tree ด้วยการใส่ข้อมูลจริง</span>
+</div>
+
+<div id="main">
+  <div id="viz-area">
+    <div id="empty-state">
+      <div class="icon">🌱</div>
+      <p>ยังไม่มีข้อมูลใน <span id="empty-tree-name">B-Tree</span></p>
+      <p style="font-size:11px;margin-top:4px;opacity:.7">เพิ่มค่าทางขวาเพื่อเริ่มต้น</p>
+    </div>
+    <svg id="tree-svg"></svg>
+  </div>
+
+  <div id="sidebar">
+    <div class="panel">
+      <h3>ตั้งค่า</h3>
+      <div class="segmented" aria-label="เลือกชนิดต้นไม้">
+        <button class="seg-btn active" id="mode-btree" onclick="changeTreeKind('btree')">B-Tree</button>
+        <button class="seg-btn" id="mode-bplus" onclick="changeTreeKind('bplus')">B+ Tree</button>
+      </div>
+      <div class="row">
+        <span class="label">Order (t)</span>
+        <select id="sel-order" onchange="changeOrder()">
+          <option value="2">t = 2 (max 3 keys)</option>
+          <option value="3" selected>t = 3 (max 5 keys)</option>
+          <option value="4">t = 4 (max 7 keys)</option>
+          <option value="5">t = 5 (max 9 keys)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>เพิ่มข้อมูล</h3>
+      <div class="row">
+        <input type="number" id="inp-insert" placeholder="ค่า 1–9999" min="1" max="9999"
+          onkeydown="if(event.key==='Enter')doInsert()">
+        <button class="btn-teal" onclick="doInsert()">เพิ่ม</button>
+      </div>
+      <div class="row">
+        <input type="number" id="inp-search" placeholder="ค้นหาค่า" min="1" max="9999"
+          onkeydown="if(event.key==='Enter')doSearch()">
+        <button class="btn-blue" onclick="doSearch()">ค้นหา</button>
+      </div>
+      <div class="row">
+        <button class="btn-red btn-full" onclick="doClear()">ล้างต้นไม้</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>ตัวอย่างชุดข้อมูล</h3>
+      <div class="chips">
+        <button class="chip" onclick="loadPreset([3,7,1,5,9,2,8,4,6,10],'1-10 แบบสุ่ม')">1–10 สุ่ม</button>
+        <button class="chip" onclick="loadPreset([10,20,30,40,50,60,70],'เพิ่มขึ้น')">เพิ่มขึ้น</button>
+        <button class="chip" onclick="loadPreset([70,60,50,40,30,20,10],'ลดลง')">ลดลง</button>
+        <button class="chip" onclick="loadPreset([15,5,20,1,10,17,12,6],'แบบ BST')">คลาสสิค</button>
+        <button class="chip" onclick="loadPreset([5,10,15,20,25,30,35,40,45,50,55,60],'ทดสอบ split')">ทดสอบ split</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>บันทึก</h3>
+      <div id="log-box">
+        <div class="log-item log-info">พร้อมใช้งาน — เพิ่มค่าเพื่อเริ่ม</div>
+      </div>
+    </div>
+
+    <div class="panel" style="flex:1">
+      <h3>ข้อมูลสถิติ</h3>
+      <div class="prop-grid" id="stats-grid">
+        <div class="prop-card"><div class="prop-lbl">Order (t)</div><div class="prop-val" id="st-t">3</div></div>
+        <div class="prop-card"><div class="prop-lbl">Keys</div><div class="prop-val" id="st-keys">0</div></div>
+        <div class="prop-card"><div class="prop-lbl">Nodes</div><div class="prop-val" id="st-nodes">0</div></div>
+        <div class="prop-card"><div class="prop-lbl">ความสูง</div><div class="prop-val" id="st-h">0</div></div>
+      </div>
+
+      <div class="rule-box">
+        <div class="rule-title">กฎ <span id="rule-tree-name">B-Tree</span> (t = <span id="t-val">3</span>)</div>
+        <div class="rule-text" id="rule-text"></div>
+      </div>
+
+      <div class="rule-box">
+        <div class="rule-title">สัญลักษณ์สี</div>
+        <div class="legend">
+          <div class="leg-item"><span class="leg-swatch" style="background:#f0fdfa;border-color:#0d9488"></span>เพิ่งใส่ข้อมูล</div>
+          <div class="leg-item"><span class="leg-swatch" style="background:#fffbeb;border-color:#f59e0b"></span>โหนดที่ถูก split</div>
+          <div class="leg-item"><span class="leg-swatch" style="background:#eff6ff;border-color:#3b82f6"></span>เส้นทางค้นหา</div>
+          <div class="leg-item"><span class="leg-swatch" style="background:#ecfdf5;border-color:#10b981"></span>พบค่าที่ต้องการ</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── B-TREE CORE ──────────────────────────────────────────────────────────────
+
+let _nid = 0;
+
+class Node {
+  constructor(leaf=true){
+    this.id = ++_nid;
+    this.keys = [];
+    this.ch = [];    // children
+    this.leaf = leaf;
+    this.next = null; // B+ tree leaf link
+  }
+}
+
+class BTree {
+  constructor(t){ this.t = t; this.root = new Node(); this.n = 0; }
+
+  insert(k, log){
+    const r = this.root;
+    if(r.keys.length === 2*this.t - 1){
+      const s = new Node(false);
+      s.ch.push(r);
+      this.root = s;
+      this._split(s, 0, log);
+      this._ins(s, k, log);
+    } else {
+      this._ins(r, k, log);
+    }
+    this.n++;
+  }
+
+  _split(par, i, log){
+    const t = this.t, y = par.ch[i];
+    const z = new Node(y.leaf);
+    z.keys = y.keys.splice(t);
+    const med = y.keys.splice(t-1, 1)[0];
+    if(!y.leaf) z.ch = y.ch.splice(t);
+    par.ch.splice(i+1, 0, z);
+    par.keys.splice(i, 0, med);
+    if(log) log.push({type:'split', msg:`🔀 Split! ค่ากลาง [${med}] ขึ้นสู่ parent`, key:med, parentId:par.id, leftId:y.id, rightId:z.id});
+    return {medianNode: par, leftId: y.id, rightId: z.id};
+  }
+
+  _ins(node, k, log){
+    let i = node.keys.length - 1;
+    if(node.leaf){
+      while(i>=0 && k < node.keys[i]) i--;
+      node.keys.splice(i+1, 0, k);
+      if(log) log.push({type:'insert', msg:`➕ เพิ่ม [${k}] ลง leaf node`});
+    } else {
+      while(i>=0 && k < node.keys[i]) i--;
+      i++;
+      const child = node.ch[i];
+      if(child.keys.length === 2*this.t-1){
+        this._split(node, i, log);
+        if(k > node.keys[i]) i++;
+      }
+      this._ins(node.ch[i], k, log);
+    }
+  }
+
+  search(k){
+    const path = [];
+    const go = (node) => {
+      if(!node) return null;
+      path.push(node.id);
+      let i = 0;
+      while(i < node.keys.length && k > node.keys[i]) i++;
+      if(i < node.keys.length && node.keys[i] === k)
+        return {found:true, nodeId:node.id, ki:i, path:[...path]};
+      if(node.leaf) return {found:false, path:[...path]};
+      return go(node.ch[i]);
+    };
+    return go(this.root);
+  }
+
+  stats(){
+    let nodes=0, h=0, leaves=0;
+    const go=(n,d)=>{if(!n)return;nodes++;h=Math.max(h,d);if(n.leaf)leaves++;n.ch.forEach(c=>go(c,d+1));};
+    go(this.root, 1);
+    return {nodes, h, leaves, keys:this.n};
+  }
+}
+
+class BPlusTree {
+  constructor(t){ this.t = t; this.root = new Node(); this.n = 0; }
+  get maxKeys(){ return 2*this.t - 1; }
+
+  insert(k, log){
+    const split = this._ins(this.root, k, log);
+    if(split){
+      const s = new Node(false);
+      s.keys = [split.sep];
+      s.ch = [this.root, split.right];
+      this.root = s;
+      if(log) log.push({type:'split', msg:`🔀 Split root! separator [${split.sep}] ขึ้นเป็น root ใหม่`, key:split.sep, parentId:s.id, leftId:s.ch[0].id, rightId:split.right.id});
+    }
+    this.n++;
+  }
+
+  _ins(node, k, log){
+    if(node.leaf){
+      let i = 0;
+      while(i < node.keys.length && k > node.keys[i]) i++;
+      node.keys.splice(i, 0, k);
+      if(log) log.push({type:'insert', msg:`➕ เพิ่ม [${k}] ลง leaf node ของ B+ tree`});
+      if(node.keys.length <= this.maxKeys) return null;
+      return this._splitLeaf(node, log);
+    }
+
+    let i = 0;
+    while(i < node.keys.length && k >= node.keys[i]) i++;
+    const split = this._ins(node.ch[i], k, log);
+    if(!split) return null;
+
+    node.keys.splice(i, 0, split.sep);
+    node.ch.splice(i+1, 0, split.right);
+    if(node.keys.length <= this.maxKeys) return null;
+    return this._splitInternal(node, log);
+  }
+
+  _splitLeaf(node, log){
+    const mid = Math.ceil(node.keys.length / 2);
+    const right = new Node(true);
+    right.keys = node.keys.splice(mid);
+    right.next = node.next;
+    node.next = right;
+    const sep = right.keys[0];
+    if(log) log.push({type:'split', msg:`🔀 Split leaf! คัดลอก separator [${sep}] ขึ้น parent`, key:sep, leftId:node.id, rightId:right.id});
+    return {sep, right};
+  }
+
+  _splitInternal(node, log){
+    const mid = Math.floor(node.keys.length / 2);
+    const sep = node.keys[mid];
+    const right = new Node(false);
+    right.keys = node.keys.splice(mid + 1);
+    node.keys.splice(mid, 1);
+    right.ch = node.ch.splice(mid + 1);
+    if(log) log.push({type:'split', msg:`🔀 Split index! separator [${sep}] ขึ้นสู่ parent`, key:sep, leftId:node.id, rightId:right.id});
+    return {sep, right};
+  }
+
+  search(k){
+    const path = [];
+    let node = this.root;
+    while(node){
+      path.push(node.id);
+      if(node.leaf){
+        const ki = node.keys.indexOf(k);
+        return ki >= 0 ? {found:true, nodeId:node.id, ki, path:[...path]} : {found:false, path:[...path]};
+      }
+      let i = 0;
+      while(i < node.keys.length && k >= node.keys[i]) i++;
+      node = node.ch[i];
+    }
+    return {found:false, path:[...path]};
+  }
+
+  stats(){
+    let nodes=0, h=0, leaves=0;
+    const go=(n,d)=>{if(!n)return;nodes++;h=Math.max(h,d);if(n.leaf)leaves++;n.ch.forEach(c=>go(c,d+1));};
+    go(this.root, 1);
+    return {nodes, h, leaves, keys:this.n};
+  }
+}
+
+// ── LAYOUT ───────────────────────────────────────────────────────────────────
+
+const KW=44, KH=40, LGAP=92, HGAP=16, PX=48, PY=36;
+
+function nodeW(n){ return n.keys.length * KW + 2; }
+
+function subW(n){
+  const nw = nodeW(n);
+  if(n.leaf || !n.ch.length) return nw;
+  const cw = n.ch.reduce((s,c)=>s+subW(c), 0) + (n.ch.length-1)*HGAP;
+  return Math.max(nw, cw);
+}
+
+function layout(n, x, y){
+  if(!n) return;
+  const sw = subW(n);
+  n.cx = x + sw/2;
+  n.cy = y;
+  n.nw = nodeW(n);
+  if(!n.leaf && n.ch.length){
+    let cx = x;
+    n.ch.forEach(c=>{const csw=subW(c); layout(c,cx,y+LGAP); cx+=csw+HGAP;});
+  }
+}
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+
+let treeKind = 'btree';
+function treeLabel(){ return treeKind === 'bplus' ? 'B+ Tree' : 'B-Tree'; }
+function createTree(t){ return treeKind === 'bplus' ? new BPlusTree(t) : new BTree(t); }
+function maxKeys(){ return 2*tree.t - 1; }
+
+let tree = createTree(3);
+let hl = {};      // nodeId -> 'insert'|'split'|'path'|'found'
+let hlKi = null;  // key index to highlight in found node
+let hlNid = null;
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+
+function render(){
+  const svg = document.getElementById('tree-svg');
+  const viz = document.getElementById('viz-area');
+  const empty = document.getElementById('empty-state');
+  const root = tree.root;
+  const hasData = root.keys.length > 0;
+  empty.style.display = hasData ? 'none' : 'block';
+  if(!hasData){ svg.innerHTML=''; svg.setAttribute('width','100%'); svg.setAttribute('height','300'); updateStats(); return; }
+
+  const cw = viz.clientWidth || 600;
+  const sw = subW(root);
+  const ox = Math.max(PX, (cw - sw) / 2);
+  layout(root, ox, PY);
+
+  let maxX=0, maxY=0;
+  const walk=(n)=>{ if(!n)return; maxX=Math.max(maxX, n.cx+n.nw/2+PX); maxY=Math.max(maxY, n.cy+KH+PY+10); n.ch.forEach(walk); };
+  walk(root);
+
+  const W = Math.max(maxX, cw), H = Math.max(maxY, 200);
+  svg.setAttribute('width', W);
+  svg.setAttribute('height', H);
+
+  let out = '';
+  if(treeKind === 'bplus'){
+    out+=`<defs><marker id="leaf-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#0d9488"/></marker></defs>`;
+  }
+
+  // edges
+  const edges=(n)=>{
+    if(!n||n.leaf) return;
+    n.ch.forEach(c=>{
+      const x1=n.cx, y1=n.cy+KH, x2=c.cx, y2=c.cy;
+      const my=(y1+y2)/2;
+      out+=`<path d="M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}" fill="none" stroke="#cbd5e1" stroke-width="1.5"/>`;
+      edges(c);
+    });
+  };
+  edges(root);
+
+  // B+ tree leaf links
+  if(treeKind === 'bplus'){
+    const leaves=[];
+    const collectLeaves=(n)=>{ if(!n)return; if(n.leaf) leaves.push(n); else n.ch.forEach(collectLeaves); };
+    collectLeaves(root);
+    for(let i=0;i<leaves.length-1;i++){
+      const a=leaves[i], b=leaves[i+1];
+      const x1=a.cx+a.nw/2+5, x2=b.cx-b.nw/2-5, y=a.cy+KH+13;
+      out+=`<path d="M${x1},${y} C${x1+18},${y} ${x2-18},${y} ${x2},${y}" fill="none" stroke="#0d9488" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#leaf-arrow)"/>`;
+    }
+  }
+
+  // nodes
+  const nodes=(n)=>{
+    if(!n) return;
+    const h=hl[n.id];
+    let fill='#fff', stroke='#99f6e4', sw2=1.5;
+    if(treeKind === 'bplus' && !n.leaf){fill='#f8fafc';stroke='#94a3b8';}
+    if(h==='insert'){fill='#f0fdfa';stroke='#0d9488';sw2=2.5;}
+    else if(h==='split'){fill='#fffbeb';stroke='#f59e0b';sw2=2.5;}
+    else if(h==='found'){fill='#ecfdf5';stroke='#10b981';sw2=2.5;}
+    else if(h==='path'){fill='#eff6ff';stroke='#3b82f6';sw2=2;}
+
+    const x=n.cx-n.nw/2, y=n.cy;
+    out+=`<g class="${n.id===hlNid?'node-new':''}">`;
+    out+=`<rect x="${x}" y="${y}" width="${n.nw}" height="${KH}" rx="8" fill="${fill}" stroke="${stroke}" stroke-width="${sw2}"/>`;
+
+    n.keys.forEach((k,i)=>{
+      const kx=x+i*KW;
+      if(i>0) out+=`<line x1="${kx}" y1="${y+7}" x2="${kx}" y2="${y+KH-7}" stroke="${stroke}" stroke-width="0.5" opacity="0.6"/>`;
+      const isFound = h==='found' && hlKi===i;
+      if(isFound) out+=`<rect x="${kx+4}" y="${y+5}" width="${KW-8}" height="${KH-10}" rx="5" fill="#bbf7d0"/>`;
+      const tc = h==='insert'?'#134e4a': h==='found'?'#065f46': h==='split'?'#78350f': h==='path'?'#1e40af': '#334155';
+      out+=`<text x="${kx+KW/2}" y="${y+KH/2}" text-anchor="middle" dominant-baseline="central" font-family="'Courier New',monospace" font-size="14" font-weight="${isFound?700:500}" fill="${tc}">${k}</text>`;
+    });
+    out+='</g>';
+    n.ch.forEach(nodes);
+  };
+  nodes(root);
+
+  svg.innerHTML = out;
+  updateStats();
+}
+
+// ── ACTIONS ───────────────────────────────────────────────────────────────────
+
+function changeTreeKind(kind){
+  if(treeKind === kind) return;
+  treeKind = kind;
+  const t = parseInt(document.getElementById('sel-order').value);
+  tree = createTree(t);
+  hl={}; hlKi=null; hlNid=null;
+  clearLog();
+  updateModeUI();
+  log({type:'info', msg:`เปลี่ยนเป็น ${treeLabel()} — เริ่มต้นต้นไม้ใหม่`});
+  render(); updateRuleText();
+}
+
+function changeOrder(){
+  const t = parseInt(document.getElementById('sel-order').value);
+  tree = createTree(t);
+  hl={}; hlKi=null; hlNid=null;
+  clearLog();
+  log({type:'info', msg:`ตั้งค่า ${treeLabel()} t=${t} — max ${2*t-1} keys ต่อ node`});
+  render(); updateRuleText();
+}
+
+function doInsert(){
+  const inp = document.getElementById('inp-insert');
+  const v = parseInt(inp.value);
+  if(isNaN(v)||v<1||v>9999){ shake('inp-insert'); return; }
+  inp.value='';
+
+  // Check duplicate
+  const chk = tree.search(v);
+  if(chk.found){ log({type:'info', msg:`⚠️ ค่า [${v}] มีอยู่แล้ว`}); return; }
+
+  hl={}; hlKi=null;
+  const steps=[];
+  tree.insert(v, steps);
+
+  // Find where key landed
+  const found = tree.search(v);
+  if(found.found){ hl[found.nodeId]='insert'; hlNid=found.nodeId; hlKi=null; }
+
+  // Log split events with highlight
+  const splits = steps.filter(s=>s.type==='split');
+  if(splits.length){
+    splits.forEach(s=>{
+      log(s);
+      [s.parentId, s.leftId, s.rightId].filter(Boolean).forEach(id=>{ hl[id]='split'; });
+    });
+  } else {
+    steps.forEach(s=>log(s));
+  }
+
+  render();
+}
+
+function doSearch(){
+  const inp = document.getElementById('inp-search');
+  const v = parseInt(inp.value);
+  if(isNaN(v)){ shake('inp-search'); return; }
+  inp.value='';
+  hl={}; hlKi=null; hlNid=null;
+  const r = tree.search(v);
+  r.path.forEach((id,i)=>{ hl[id]= i===r.path.length-1 && r.found ? 'found' : 'path'; });
+  if(r.found){ hlKi=r.ki; log({type:'found', msg:`✓ พบ [${v}] หลังตรวจ ${r.path.length} node`}); }
+  else { log({type:'notfound', msg:`✗ ไม่พบ [${v}] — ตรวจ ${r.path.length} node`}); }
+  render();
+}
+
+function doClear(){
+  const t=parseInt(document.getElementById('sel-order').value);
+  tree=createTree(t); hl={}; hlKi=null; hlNid=null;
+  clearLog(); log({type:'info', msg:'ล้างต้นไม้แล้ว'}); render();
+}
+
+function loadPreset(vals, name){
+  const t=parseInt(document.getElementById('sel-order').value);
+  tree=createTree(t); hl={}; hlKi=null; hlNid=null;
+  vals.forEach(v=>tree.insert(v,null));
+  clearLog(); log({type:'insert', msg:`โหลด "${name}": [${vals.join(', ')}]`}); render();
+}
+
+// ── LOG ───────────────────────────────────────────────────────────────────────
+
+function log(e){
+  const box=document.getElementById('log-box');
+  const cls={'insert':'log-insert','split':'log-split','found':'log-found','notfound':'log-notfound','info':'log-info'}[e.type]||'log-info';
+  const div=document.createElement('div');
+  div.className='log-item '+cls; div.textContent=e.msg;
+  box.insertBefore(div, box.firstChild);
+  while(box.children.length>25) box.removeChild(box.lastChild);
+}
+
+function clearLog(){ document.getElementById('log-box').innerHTML=''; }
+
+// ── STATS ─────────────────────────────────────────────────────────────────────
+
+function updateModeUI(){
+  document.getElementById('mode-btree').classList.toggle('active', treeKind === 'btree');
+  document.getElementById('mode-bplus').classList.toggle('active', treeKind === 'bplus');
+  document.getElementById('empty-tree-name').textContent = treeLabel();
+  document.getElementById('rule-tree-name').textContent = treeLabel();
+}
+
+function updateStats(){
+  const s=tree.stats(), t=tree.t;
+  document.getElementById('st-t').textContent=t;
+  document.getElementById('st-keys').textContent=s.keys;
+  document.getElementById('st-nodes').textContent=s.nodes;
+  document.getElementById('st-h').textContent=s.h;
+}
+
+function updateRuleText(){
+  const t=tree.t;
+  updateModeUI();
+  document.getElementById('t-val').textContent=t;
+  if(treeKind === 'bplus'){
+    document.getElementById('rule-text').innerHTML=
+      `ข้อมูลจริงอยู่ที่ leaf เท่านั้น และ leaf เชื่อมกันเป็นลำดับ<br>
+       index node เก็บ separator เพื่อพาไปยัง child ที่ถูกต้อง<br>
+       แต่ละ node เก็บได้สูงสุด <span class="pill">${2*t-1}</span> keys<br>
+       เมื่อ leaf เต็ม จะ split แล้วคัดลอก separator ขึ้น parent`;
+  } else {
+    document.getElementById('rule-text').innerHTML=
+      `แต่ละ node เก็บ <span class="pill">${t-1}–${2*t-1}</span> keys ยกเว้น root<br>
+       มีได้สูงสุด <span class="pill">${2*t}</span> children<br>
+       เมื่อ node เต็ม <span class="pill">${2*t-1} keys</span> จะ split อัตโนมัติ<br>
+       ทุก leaf อยู่ระดับเดียวกัน → ค้นหา O(log n) เสมอ`;
+  }
+}
+
+function shake(id){
+  const el=document.getElementById(id);
+  el.style.borderColor='#f43f5e';
+  el.style.background='#fff1f2';
+  setTimeout(()=>{ el.style.borderColor=''; el.style.background=''; },800);
+}
+
+window.addEventListener('resize',()=>{ if(tree.root.keys.length) render(); });
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+updateModeUI();
+updateRuleText();
+updateStats();
+render();
+</script>
+</body>
+</html>
