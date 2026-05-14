@@ -169,6 +169,7 @@ btn,button{display:inline-flex;align-items:center;justify-content:center;height:
         <button class="chip" onclick="loadPreset([70,60,50,40,30,20,10],'ลดลง')">ลดลง</button>
         <button class="chip" onclick="loadPreset([15,5,20,1,10,17,12,6],'แบบ BST')">คลาสสิค</button>
         <button class="chip" onclick="loadPreset([5,10,15,20,25,30,35,40,45,50,55,60],'ทดสอบ split')">ทดสอบ split</button>
+        <button class="chip" onclick="loadPreset([2,3,5,7,11,17,19,23,29,31],'prime split')">prime split</button>
       </div>
     </div>
 
@@ -293,7 +294,8 @@ class BTree {
 
 class BPlusTree {
   constructor(t){ this.t = t; this.root = new Node(); this.n = 0; }
-  get maxKeys(){ return 2*this.t - 1; }
+  get maxLeafKeys(){ return 2*this.t - 1; }
+  get maxIndexKeys(){ return 2*this.t - 2; }
 
   insert(k, log){
     const split = this._ins(this.root, k, log);
@@ -313,7 +315,7 @@ class BPlusTree {
       while(i < node.keys.length && k > node.keys[i]) i++;
       node.keys.splice(i, 0, k);
       if(log) log.push({type:'insert', msg:`➕ เพิ่ม [${k}] ลง leaf node ของ B+ tree`});
-      if(node.keys.length <= this.maxKeys) return null;
+      if(node.keys.length <= this.maxLeafKeys) return null;
       return this._splitLeaf(node, log);
     }
 
@@ -324,7 +326,7 @@ class BPlusTree {
 
     node.keys.splice(i, 0, split.sep);
     node.ch.splice(i+1, 0, split.right);
-    if(node.keys.length <= this.maxKeys) return null;
+    if(node.keys.length <= this.maxIndexKeys) return null;
     return this._splitInternal(node, log);
   }
 
@@ -597,6 +599,16 @@ function updateModeUI(){
   document.getElementById('mode-bplus').classList.toggle('active', treeKind === 'bplus');
   document.getElementById('empty-tree-name').textContent = treeLabel();
   document.getElementById('rule-tree-name').textContent = treeLabel();
+  updateOrderLabels();
+}
+
+function updateOrderLabels(){
+  document.querySelectorAll('#sel-order option').forEach(opt=>{
+    const t = parseInt(opt.value);
+    opt.textContent = treeKind === 'bplus'
+      ? `t = ${t} (leaf ${2*t-1}, index ${2*t-2})`
+      : `t = ${t} (max ${2*t-1} keys)`;
+  });
 }
 
 function updateStats(){
@@ -615,8 +627,8 @@ function updateRuleText(){
     document.getElementById('rule-text').innerHTML=
       `ข้อมูลจริงอยู่ที่ leaf เท่านั้น และ leaf เชื่อมกันเป็นลำดับ<br>
        index node เก็บ separator เพื่อพาไปยัง child ที่ถูกต้อง<br>
-       แต่ละ node เก็บได้สูงสุด <span class="pill">${2*t-1}</span> keys<br>
-       เมื่อ leaf เต็ม จะ split แล้วคัดลอก separator ขึ้น parent`;
+       leaf เก็บได้สูงสุด <span class="pill">${2*t-1}</span> keys, index เก็บได้ <span class="pill">${2*t-2}</span> separators<br>
+       เมื่อ leaf หรือ index เต็ม จะ split แล้วส่ง separator ขึ้น parent`;
   } else {
     document.getElementById('rule-text').innerHTML=
       `แต่ละ node เก็บ <span class="pill">${t-1}–${2*t-1}</span> keys ยกเว้น root<br>
